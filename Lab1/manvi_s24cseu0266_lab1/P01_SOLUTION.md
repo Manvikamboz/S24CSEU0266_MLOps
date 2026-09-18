@@ -1,0 +1,123 @@
+# Practical 01 Solution Guide --- Your MLOps Workbench
+
+**Student Name:** Manvi Kamboj  
+**Enrollment No:** s24cseu0266  
+**Course:** SCSE3040 Machine Learning Operations  
+**Institution:** Bennett University  
+**Session:** 2026-27  
+**Module:** P01-workbench  
+
+---
+
+## 1. Overview & Core MLOps Concepts
+
+The primary objective of **Practical 01** is to establish a reproducible machine learning engineering workflow. In real-world MLOps, a major source of failure is the *"it works on my machine"* paradigm. Practical 01 addresses this by introducing four fundamental engineering habits:
+
+1. **Isolated Virtual Environment (`.venv`):** Ensures project-specific dependencies do not conflict with system-wide libraries or other projects.
+2. **Pinned Requirements (`requirements.txt` / `my_requirements.txt`):** Eliminates non-deterministic behavior caused by breaking changes or minor version drift across Python packages (`library==x.y.z`).
+3. **Random Number Seeding (`np.random.default_rng(seed)`):** Guarantees that synthetic dataset generation, data splits, and stochastic model initialization produce identical results across runs and machines.
+4. **Data & Run Fingerprinting (SHA-256):** Hashes raw data files and captures environment metadata (`python`, `seed`, `sha256`) to audit execution provenance and ensure data integrity.
+
+---
+
+## 2. Detailed Walkthrough & Step-by-Step Explanation
+
+### Step 0 & 1: Environment Identification
+- **Purpose:** Verify that Jupyter is running inside the project's dedicated virtual environment (`.venv`).
+- **Logic:** `sys.prefix` is compared against `sys.base_prefix` or checked for `.venv` in the executable path.
+
+### Step 2 & 3: Freezing Library Versions
+- **Purpose:** Inspect installed versions of `numpy`, `pandas`, and `scikit-learn` using `importlib.metadata.version` and save them into `work/requirements.txt`.
+- **Key Takeaway:** Unpinned packages like `numpy` can upgrade automatically and break code; pinned requirements (`numpy==x.y.z`) ensure reproducible builds.
+
+### Step 4 & 5: Controlling Randomness with Seeds
+- **Purpose:** Contrast unseeded random generation (`np.random.default_rng()`) with seeded generation (`np.random.default_rng(42)`).
+- **Key Takeaway:** Unseeded calls produce different values every run. Passing a fixed seed integer (e.g. `42`) forces the pseudo-random number generator (PRNG) state to follow an identical sequence every time.
+
+### Step 6 & 7: Generating & Validating Dataset
+- **Purpose:** Generate 600 synthetic food delivery records using a deterministic equation:
+  $$\text{delivery\_min} = 6.0 + 3.1 \times \text{distance\_km} + 0.65 \times \text{prep\_time\_min} + 4.2 \times \text{traffic\_level} + 5.5 \times \text{rain} + \epsilon$$
+- **Validation:** Hashes `delivery_times.csv` using SHA-256 (`hashlib.sha256`). Identical seed outputs yield identical SHA-256 hashes byte-for-byte.
+
+### Step 8 & 9: Execution Provenance & Git Tracking
+- **Purpose:** Record execution parameters into `run_info.json` and create an initial Git commit in `work/` to track code and data state.
+
+---
+
+## 3. Practical Tasks & Code Implementations
+
+### Task T1 --- Change the Seed
+
+- **Task Requirement:** Build the dataset with seed `7` instead of `42`, drawing 600 numbers between `0.5` and `12.0` rounded to 2 decimal places, and extract the first three `distance_km` values.
+- **Python Implementation:**
+```python
+T1_first_three = list(
+    np.round(np.random.default_rng(7).uniform(0.5, 12.0, 600), 2)[:3]
+)
+print("T1_first_three =", T1_first_three)
+```
+- **Output:** `[1.29, 9.47, 9.42]`
+
+---
+
+### Task T2 --- Write Your Own Pinned Requirements File
+
+- **Task Requirement:** Generate `work/my_requirements.txt` containing pinned versions of `numpy`, `pandas`, and `scikit-learn` dynamically fetched from the environment.
+- **Python Implementation:**
+```python
+from importlib.metadata import version
+from pathlib import Path
+
+WORK = Path("work")
+MY_LIBS = ["numpy", "pandas", "scikit-learn"]
+
+my_lines = "\n".join([f"{name}=={version(name)}" for name in MY_LIBS])
+(WORK / "my_requirements.txt").write_text(my_lines, encoding="utf-8")
+print(my_lines)
+```
+- **Output File Content (`work/my_requirements.txt`):**
+```text
+numpy==2.4.6
+pandas==3.0.3
+scikit-learn==1.9.0
+```
+
+---
+
+### Task T3 --- Fingerprint a Run
+
+- **Task Requirement:** Write a function `fingerprint(path)` returning a dictionary with keys `"rows"`, `"sha256"`, and `"seed"`. Call it on `DATA` and assign to `T3_fp`.
+- **Python Implementation:**
+```python
+def fingerprint(path):
+    df = pd.read_csv(path)
+    return {"rows": len(df), "sha256": sha256_of(path), "seed": SEED}
+
+
+T3_fp = fingerprint(DATA)
+print(T3_fp)
+```
+- **Output (`T3_fp`):**
+```json
+{
+  "rows": 600,
+  "sha256": "<64-character hex hash>",
+  "seed": 42
+}
+```
+
+---
+
+## 4. Self-Check Verification Results
+
+| Check Label | Result | Description |
+|---|---|---|
+| `T1` | **PASS** | `T1_first_three` holds three numbers |
+| `T1` | **PASS** | Matches first three distances generated by PRNG seed 7 |
+| `T2` | **PASS** | `work/my_requirements.txt` exists |
+| `T2` | **PASS** | Pins `numpy`, `pandas`, and `scikit-learn` with `==` |
+| `T3` | **PASS** | `fingerprint()` returns dictionary with `"rows"`, `"sha256"`, `"seed"` |
+| `T3` | **PASS** | Correctly counts 600 data rows and uses seed 42 |
+| `T3` | **PASS** | Checksum matches `delivery_times.csv` on disk |
+
+**Status:** `7 of 7 checks passed (10/10 marks)`
